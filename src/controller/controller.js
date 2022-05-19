@@ -4,6 +4,7 @@ const redis = require("redis");
 const { promisify } = require("util");
 const baseUrl = "http://localhost:3000";
 
+//Connection with Redis 
 const redisClient = redis.createClient(
   14831,
   "redis-14831.c264.ap-south-1-1.ec2.cloud.redislabs.com",
@@ -40,7 +41,7 @@ const urlShortner = async function (req, res) {
   }
 
   let reg =
-    /^(https:\/\/www\.|http:\/\/www\.|www\.|https:\/\/|http:\/\/)[a-zA-Z0-9\-_.$]+\.[a-zA-Z]{2,5}(:[0-9]{1,5})?(\/[^\s]*)$/gm;
+    /^(https:\/\/www\.|http:\/\/www\.|www\.|https:\/\/|http:\/\/)[^www.,-_][a-zA-Z0-9\-_.$]+\.[a-zA-Z]{2,5}(:[0-9]{1,5})?(\/[^\s]*)$/gm;
   let regex = reg.test(longUrl);
 
   if (regex === false) {
@@ -60,6 +61,11 @@ const urlShortner = async function (req, res) {
     } else {
         let urlCode = req.body.urlCode
       if (urlCode) {
+          if(!(/^([a-z0-9\-_]{8}$)/).test(urlCode)){
+            return res
+            .status(400)
+            .send({ status: false, msg: "Please enter the correct format --- Its length should be 8 characters and Use only alphabets, digits, - and _" });
+          }
         let urlCodee = await model.findOne({ urlCode: urlCode });
         if (urlCodee) {
           return res
@@ -96,7 +102,7 @@ const getUrl = async function (req, res) {
   cachedData = JSON.parse(cachedProfileData);
  
   if (cachedData) {
-    console.log("taking from cache" + cachedData.longUrl);
+    //console.log("taking from cache" + cachedData.longUrl);
     res.status(302).redirect(cachedData.longUrl);
   } else {
     await SET_ASYNC(`${code}`, JSON.stringify(urlObject));
