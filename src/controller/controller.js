@@ -18,23 +18,27 @@ redisClient.on("connect", async function () {
   console.log("Connected to Redis..");
 });
 
-const SET_ASYNC = promisify(redisClient.SET).bind(redisClient);
-const GET_ASYNC = promisify(redisClient.GET).bind(redisClient);
 
+const SET_ASYNC = promisify(redisClient.SET).bind(redisClient); //SET key
+const GET_ASYNC = promisify(redisClient.GET).bind(redisClient); //GET key
+
+// Generating random string
 function makeid(length) {
   let result = "";
   let characters = "abcdefghijklmnopqrstuvwxyz0123456789-_";
   let charactersLength = characters.length;
   for (let i = 0; i < length; i++) {
-    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    result += characters.charAt(Math.floor(Math.random() * charactersLength)); //Math.floor() function returns the largest integer less than or equal to a given number.
   }
   return result;
 }
 
+//POST API
 const urlShortner = async function (req, res) {
   const { longUrl } = req.body;
 
-  if (!longUrl.trim()) {
+// long url validation
+  if (!longUrl || !longUrl.trim()) {
     return res
       .status(400)
       .send({ status: false, msg: "Please Enter the Url." });
@@ -49,37 +53,45 @@ const urlShortner = async function (req, res) {
       .status(400)
       .send({ status: false, msg: "Please Enter a valid URL." });
   }
+
+  //taking from cache memory
   let cachedData = await GET_ASYNC(`${longUrl}`);
   
   cachedData = JSON.parse(cachedData);
+
   if (cachedData) {
-    return res.status(200).send({ status: true, data: cachedData });
-  } else {
+    return res.status(200).send({ status: true, data: cachedData }); //response from cache
+  } 
+  else {
     let url = await model.findOne({ longUrl });
     if (url) {
-      return res.status(200).send({ status: true, data: url });
-    } else {
-        let urlCode = req.body.urlCode
+      return res.status(200).send({ status: true, data: url }); // response of same url from db
+    } 
+    else {
+        let urlCode = req.body.urlCode //user is providing URLCode
       if (urlCode) {
           if(!(/^([a-z0-9\-_]{8}$)/).test(urlCode)){
             return res
             .status(400)
             .send({ status: false, msg: "Please enter the correct format --- Its length should be 8 characters and Use only alphabets, digits, - and _" });
           }
-        let urlCodee = await model.findOne({ urlCode: urlCode });
+        let urlCodee = await model.findOne({ urlCode: urlCode }); //urlcode is unique
         if (urlCodee) {
           return res
             .status(400)
             .send({ status: false, msg: "This Url code is not available" });
-        } else {
+        } 
+        else {
+            //urlcode is available
             const shortUrl = baseUrl + "/" + urlCode
 
           url = await model.create({ longUrl, shortUrl, urlCode });
-          console.log(url)
+          
           await SET_ASYNC(`${longUrl}`, JSON.stringify(url));
           return res.status(200).send({ status: true, data: url });
         }
       }else{
+          // no urlcode receieved from re body
       //const urlCode = shortid.generate().toLowerCase();
       const urlCode = makeid(8);
       const shortUrl = baseUrl + "/" + urlCode;
@@ -90,6 +102,7 @@ const urlShortner = async function (req, res) {
   }
 };
 
+//GET API
 const getUrl = async function (req, res) {
   let code = req.params.urlCode;
   const urlObject = await model.findOne({ urlCode: code });
@@ -97,15 +110,14 @@ const getUrl = async function (req, res) {
       res.status(400).send({status: false, message: "Wrong URL"})
   }
 
-  let cachedProfileData = await GET_ASYNC(`${code}`);
+  let cachedProfileData = await GET_ASYNC(`${urlObject.longUrl}`);
  
   cachedData = JSON.parse(cachedProfileData);
  
   if (cachedData) {
-    //console.log("taking from cache" + cachedData.longUrl);
     res.status(302).redirect(cachedData.longUrl);
   } else {
-    await SET_ASYNC(`${code}`, JSON.stringify(urlObject));
+    //await SET_ASYNC(`${code}`, JSON.stringify(urlObject));
 
     res.status(302).redirect(urlObject.longUrl);
   }
